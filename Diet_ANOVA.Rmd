@@ -1,0 +1,280 @@
+---
+title: "ANOVA"
+output: pdf_document
+date: "2022-11-08"
+---
+
+Bộ dữ liệu chứa thông tin về 78 người thực hiện một trong ba chế độ ăn kiêng (gọi là chế độ ăn kiêng 1 , 2 và 3 ). Có thông tin cơ bản như tuổi, giới tính và chiều cao. Mục đích của nghiên cứu là để xem chế độ ăn uống nào là tốt nhất để giảm cân.
+
+# 1. Đọc dữ liệu
+
+```{r}
+setwd("C:/Users/ADMIN/OneDrive - VNU-HCMUS/NAM_4/HK1/LinearModel/ANOVA")
+diet = read.csv("Diet.csv", row.names = 1)
+diet
+```
+
+Ta cần quan tâm các biến:
+
+-   **gender**: giới tính (1=nam, 0=nữ)
+
+-   **Diet**: các chế độ ăn kiêng. Gồm chế độ 1, 2 và 3
+
+-   **pre.weight**: cân nặng trước khi ăn kiêng
+
+-   **weight6weeks**: cân nặng sau khi ăn kiêng 6 tuần
+
+Để biết rõ chế độ ăn kiêng có thực sự ảnh hưởng đến cân nặng hay không ta phải xem xét sự thay đổi cân nặng sau khi ăn kiêng. Do đó, cần tạo một biến mới để định nghĩa sự thay đổi cân nặng lúc trước khi ăn kiêng và sau khi ăn kiêng.
+
+Ta đặt đó là biến:
+
+-   **weight** **=** **pre.weight - weight6weeks:** sự thay đổi cân nặng trước và sau ăn kiêng
+
+```{r}
+diet$weight = diet$pre.weight - diet$weight6weeks
+head(diet)
+```
+
+```{r}
+diet$Diet   = factor(diet$Diet,levels=c("1","2","3"))
+diet$gender      = factor(diet$gender,levels=c("0","1"))
+head(diet)
+```
+
+# 2. Làm sạch dữ liệu
+
+Xem số dòng và cột của dữ liệu ban đầu.
+
+```{r}
+dim(diet)
+```
+
+Tiếp theo, ta kiểm tra xem dữ liệu có bị khuyết không.
+
+```{r}
+f=function(x){any(is.na(x))}
+apply(diet,2,f)
+```
+
+Như vậy, ở cột **gender** có dữ liệu bị khuyết. Các cột còn lại đều không có dữ liệu khuyết.
+
+Tiếp theo, ta phải kiểm tra xem có bao nhiêu dòng dữ liệu bị khuyết ở cột này.
+
+```{r}
+sum(is.na(diet$gender))
+```
+
+Ta thấy chỉ có 2 dòng (so với 78) chứa dữ liệu khuyết nên có thể loại bỏ 2 dòng này. Và kiểm tra lại số dòng.
+
+```{r}
+diet<-na.omit(diet)
+dim(diet)
+```
+
+# 3. Làm rõ dữ liệu
+
+Sau khi xử lý dữ liệu xong, ta nên dùng các thống kê mô tả và đồ thị cần thiết để có cái nhìn tổng quan về dữ liệu.
+
+```{r}
+summary(diet)
+```
+
+Quan sát kết quả ta thấy:
+
+-   Có 43 nữ và 33 nam được khảo sát.
+
+-   Số người tham gia ăn kiêng ở 3 chế độ xấp xỉ nhau.
+
+-   Trung bình cân nặng nhìn chung đã giảm. Tuy nhiên, có một số người tăng cân khi thực hiện chế độ ăn kiêng (vì sự chênh lệch cân nặng thấp nhất là -2).
+
+```{r}
+boxplot(weight~Diet, data=diet, col = 5:6) 
+```
+
+Từ boxplot ta cũng có thể nhận ra rằng với chế độ ăn thứ 3 thì trung bình cân nặng giảm nhiều hơn so với chế độ 1 và 2. Tương tự, trung bình cân nặng ở chế độ 1 và 2 có giảm và xấp xỉ nhau.
+
+# 4. Kiểm định (Bỏ)
+
+# 5. Phân tích ANOVA một nhân tố
+
+Xem xét: Chế độ ăn kiêng nào hiệu quả nhất trong việc giảm cân.
+
+## Xây dựng mô hình
+
+Ta cần
+
+-   thực hiện ANOVA một chiều Fisher's, Welch's và Kruskal-Wallis, tương ứng bằng hàm aov(), oneway.test() và kruskal.test
+
+-   hiển thị và phân tích kết quả: Sử dụng hàm summary() để hiển thị kết quả của một đối tượng thuộc lớp aov() và hàm print() cho kết quả khác.
+
+```{r}
+diet.fisher  = aov(weight~Diet,data=diet)
+diet.welch   = oneway.test(weight~Diet,data=diet)
+diet.kruskal = kruskal.test(weight~Diet,data=diet)
+
+summary(diet.fisher)
+```
+
+```{r}
+print(diet.welch)
+```
+
+```{r}
+print(diet.kruskal)
+```
+
+```{r}
+TukeyHSD(aov(weight~Diet, data=diet), conf.level = 0.95)
+```
+
+Dựa trên những kết quả này, ta thấy không có sự khác biệt về trung bình chênh lệch cân nặng của chế độ 1 và 2. Với chế độ 3 thì trung bình thay đổi cân nặng lớn hơn so với 1 và 2.
+
+Ta có thể xem xét trung bình sự chênh lệch cân nặng ở chế độ 1 và 3 để dễ dàng so sánh.
+
+```{r}
+t.test(weight~Diet,data=diet[diet$Diet!="2",],var.equal = TRUE)
+```
+
+## Kiểm tra mô hình
+
+Đầu tiên ta cần:
+
+-   xác định phần dư của Fisher và Welch bằng cách trừ giá trị trung bình của mỗi nhóm cho mức giảm cân của những người tham gia tương ứng
+
+-   xác định phần dư của Kruskal bằng cách trừ giá trị trung bình của mỗi nhóm cho trọng lượng giảm của những người tham gia tương ứng
+
+Giá trị trung bình hoặc giá trị trung bình của mỗi nhóm có thể thu được bằng hàm tapply()cho phép áp dụng một hàm (như meanhoặc median) cho và bằng
+
+```{r}
+mean_group   = tapply(diet$weight,diet$Diet,mean)
+median_group = tapply(diet$weight,diet$Diet,median)
+mean_group
+```
+
+```{r}
+median_group
+```
+
+
+```{r}
+# Gía trị thặng dư
+diet$resid.mean   = (diet$weight - mean_group[as.numeric(diet$Diet)])
+diet$resid.median = (diet$weight - median_group[as.numeric(diet$Diet)])
+diet[1:10,]
+```
+
+Tiếp theo ta sẽ:
+
+-   hiển thị biểu đồ hình hộp của các phần dư mỗi nhóm để đánh giá xem (i) phương sai của mỗi nhóm có giống nhau hay không (ii) tính chuẩn của phần dư mỗi nhóm có đáng tin cậy không
+
+-   hiển thị một biểu đồ QQ về các phần dư của mô hình trung bình để đánh giá xem độ lệch chuẩn của các phần dư có đáng tin cậy hay không
+
+```{r}
+par(mfrow=c(1,2),mar=c(4.5,4.5,2,0)) 
+#
+boxplot(resid.mean~Diet,data=diet,main="Residual boxplot per group",col="light gray",xlab="Diet",ylab="Residuals")
+abline(h=0,col="blue")
+#
+col_group = rainbow(nlevels(diet$Diet))
+qqnorm(diet$resid.mean,col=col_group[as.numeric(diet$Diet)])
+qqline(diet$resid.mean)
+legend("top",legend=levels(diet$Diet),col=col_group,pch=21,ncol=3,box.lwd=NA)
+```
+
+**Nhận xét**: Dựa vào biểu đồ Q-Q ta thấy các giá trị thặng dư xấp xỉ trên một đường thẳng nên có thể thấy các sai số tuân theo phân phối chuẩn.
+
+Cuối cùng:
+
+-   thực hiện kiểm tra Shapiro để đánh giá xem có đủ bằng chứng cho thấy phần dư tuân theo phân phối chuẩn (bằng shapiro.test())
+
+-   thực hiện kiểm tra của Bartlett để đánh giá xem có đủ bằng chứng cho thấy phần dư của mỗi nhóm không có phương sai khác nhau hay không (theo hàm bartlett.test().)
+
+```{r}
+shapiro.test(diet$resid.mean)
+```
+
+Vì p-value khá lớn nên ta kết luận các phần dư có phân phối chuẩn.
+
+```{r}
+bartlett.test(diet$resid.mean~as.numeric(diet$Diet))
+```
+
+Tương tự, ta cũng kệt luận được rằng các phương sai đồng nhất với nhau.
+
+# 6. Phân tích ANOVA hai nhân tố.
+
+Bài toán: chế độ ăn kiêng **Diet** và giới tính **gender** ảnh hưởng như thế nào đến việc giảm cân **weight**
+
+Trước tiên ta cần xem lại dữ liệu:
+
+```{r}
+head(diet)
+```
+
+Với biến **gender**: 0 = nữ, 1 = nam.
+
+```{r}
+par(mfrow = c(1, 2))
+with(diet, interaction.plot(gender, Diet, weight, lwd = 2, col = 1:4))
+with(diet, interaction.plot(Diet, gender, weight, lwd = 2, col = 1:3))
+```
+
+Nhận xét: các đường thẳng cắt nhau nên các biến **Diet** và **gender** có sự tương tác với nhau. Do đó, ta sẽ dùng mô hình tương tác sau:
+
+```{r}
+diet_int = aov(weight ~ Diet * gender, data = diet)
+```
+
+Để dự đoán, ta tạo ra bảng chứa các giá trị dự đoán như bảng bên dưới
+
+```{r}
+diet_table = expand.grid(Diet = unique(diet$Diet), gender = unique(diet$gender))
+diet_table
+matrix(paste0(diet_table$Diet, "-", diet_table$gender) , 3, 2, byrow = TRUE)
+```
+
+```{r}
+# Hàm dự đoán giá trị trung bình
+get_est_means = function(model, table) {
+  mat = matrix(predict(model, table), nrow = 3, ncol = 2, byrow = TRUE)
+  colnames(mat) = c("0", "1")
+  rownames(mat) = c("I", "II", "III")
+  mat
+}
+```
+
+Tiếp theo, ta thu được các giá trị dự đoán từ mô hình tương tác.
+
+*Lưu ý: các cột "0" và cột "1" là cột thứ 0 và thứ 1. Không thể hiện giới tính. Tương tự với hàng I, II và III.*
+
+```{r}
+knitr::kable(get_est_means(model = diet_int, table = diet_table))
+```
+
+Từ kết quả ước tính trên ta thấy rằng: Đối với nữ thực hiện chế độ ăn kiêng thứ 3 thì cân nặng sẽ giảm đáng kể so với chế độ 1 và 2 (5.88 so với 3.05 và 2.61). Đối với nam thực hiện ăn kiêng thì cả 3 chế độ đều giảm được số cân nặng xấp xỉ nhau.
+
+Ta sẽ xem xét liệu mô hình tương tác có thật sự có ý nghĩa hay không
+
+```{r}
+summary(aov(weight ~ Diet * gender, data = diet))
+```
+
+**Nhận xét**:
+
+-   Ta thấy rằng biến **gender** không có ý nghĩa đối với mô hình ở mức ý nghĩa 5%.
+
+-   Sự tương tác giữa **Diet** và **gender** thì có ý nghĩa với mô hình.
+
+```{r}
+TukeyHSD(aov(weight ~ Diet * gender, data = diet))
+```
+
+**Nhận xét**:
+
+Đối với nữ: thực hiện chế độ ăn kiếng thứ 3 thì cân nặng sẽ được giảm nhiều hơn so với chế độ 1 và 2.
+
+Đối với nam: thực hiện chế độ ăn kiêng nào cũng sẽ giảm được số cân nặng xấp xỉ nhau.
+
+```{r}
+plot(TukeyHSD(aov(weight ~ Diet * gender, data = diet)))
+```
