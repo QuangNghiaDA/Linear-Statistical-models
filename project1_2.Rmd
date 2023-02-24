@@ -1,0 +1,245 @@
+---
+title: ''
+output: pdf_document
+date: "2022-11-13"
+---
+
+Bài toán thực hiện trên tập ***Islander_data.csv**.* Dữ liệu chứa thông tin của một thử nghiệm về tác dụng phụ của các loại thuốc chống trầm cảm đối với trí nhớ của người tham gia thử nghiệm, được đánh giá thông qua thời gian hoàn thành một bài kiểm tra trí nhớ.
+
+Gồm có 198 người thực hiện với các thông tin cơ bản như: tên, tuổi, loại thuốc, liều lượng,... Dựa vào các biến này, ta sẽ thực hiện **phân tích ANOVA** vì ta muốn kiểm tra xem thuốc chống trầm cảm có tác động như thế nào đến trí nhớ của con người, tức là với loại thuốc nào, liều lượng cao hay thấp và loại cảm xúc tại thời điểm đó của bệnh nhân sẽ là phù hợp nhất với người sử dụng.
+
+# a. Đọc dữ liệu và làm sạch dữ liệu
+
+Đầu tiên, ta import dữ liệu dưới tên ***'islander'***
+
+```{r}
+setwd("C:/Users/ADMIN/OneDrive - VNU-HCMUS/NAM_4/HK1/LinearModel/PROJECT_MHTKKT/data_tieuluan_MHTKTT")
+islander = read.csv("Islander_data.csv")
+islander
+```
+
+Ý nghĩa các biến:
+
+-   *age*: tuổi người tham gia
+
+-   *Happy_Sad_group*: loại ký ức được tiếp xúc trước khi kiểm tra (H: vui, S: buồn)
+
+-   *Dosage*: Mức độ hàm lượng thuốc sử dụng (1: thấp, 2: trung bình, 3: cao)
+
+-   *Drug*: Loại thuốc sử dụng (A: , Alprazolam, T: Triazolam, S: Placebo)
+
+-   *Mem_Score_Before*: Thời gian cần để hoàn thành bài kiểm tra trí nhớ trước khi tiếp xúc với thuốc
+
+-   *Mem_Score_After*: Thời gian cần để hoàn thành bài kiểm tra trí nhớ trước sau khi lệ thuộc thuốc
+
+-   *Diff = Mem_Score_After - Mem_Score_Before*: Chênh lệch giữa thời gian hoàn thành bài kiểm tra trước và sau khi thí nghiệm
+
+[Lưu ý]{.underline}: thời gian hoàn thành bài kiểm tra ngắn hơn thì trí nhớ tốt hơn. Đồng nghĩa với việc *Diff* bé hơn thì tốt hơn.
+
+Kiểm tra số dòng và số cột (gồm 198 dòng và 9 cột)
+
+```{r}
+dim(islander)
+```
+
+Tiếp theo, ta kiểm tra xem dữ liệu có bị khuyết không.
+
+```{r}
+f=function(x){any(is.na(x))}
+apply(islander,2,f)
+```
+
+Như vậy, data không có dữ liệu khuyết.
+
+# b. Trực quan hóa dữ liệu
+
+Trong phần này ta xem xét dữ liệu có thỏa yêu cầu của thí nghiệm hay không và dùng đồ thị để rõ hơn về sự tác động giữa các biến *Happy_Sad_group, Dosage, Drug* lên biến *Diff*
+
+Ta thấy rằng biến *first_name* và *last_name* là không cần thiết. Do đó ta sẽ loại bỏ 2 biến này.
+
+```{r}
+islander$first_name <- NULL
+islander$last_name <- NULL
+attach(islander)
+head(islander)
+```
+
+## Kiểm tra dữ liệu
+
+```{r}
+hist(age)
+```
+
+Ta thấy rằng có nhiều người tham gia có độ tuổi từ 25-40. Trong phần mô tả của dữ liệu, tuổi của người tham gia phải từ 25 trở lên. Tuy nhiên, trong histogram trên cho thấy vẫn có người dưới 25 tuổi.
+
+```{r}
+summary(age)
+sum(age==24)
+```
+
+Chỉ có một người tham gia 24 tuổi. Điều này không ảnh hưởng đến 197 quan sát còn lại.
+
+Tiếp theo, ta kiểm tra sự phân bố đồng đều giữa các nhóm.
+
+Ta xác định các biến factor sau:
+
+```{r}
+Happy_Sad_group = as.factor(Happy_Sad_group)
+Drug = as.factor(Drug)
+Dosage = as.factor(Dosage)
+```
+
+Tiếp theo, chúng ta kiểm tra sự đồng đều ở nhóm Happy và nhóm Sad:
+
+```{r}
+table(Happy_Sad_group)
+```
+
+Số người tham gia ở mỗi nhóm là như nhau.
+
+Tương tự với biến loại thuốc đã sử dụng *Drug*
+
+```{r}
+table(Drug)
+```
+
+Ta cũng có số người tham gia sử dụng cả 3 loại thuốc tương đương nhau.
+
+Tuy nhiên, ta cũng cần xem xét liều lượng *Dosage* cùng với cả 2 biến trước.
+
+```{r}
+table(Drug, Happy_Sad_group, Dosage)
+```
+
+Như vậy, ta có một sự phân bố đồng đều theo cả 3 biến.
+
+Tiếp theo, ta xem xét các thống kê mô tả của biến Diff:
+
+```{r}
+summary(Diff)
+sd(Diff)
+```
+
+Ta thấy, trung bình là 2.955, tức là trung bình thời gian hoàn thành bài kiểm tra trí nhớ tăng lên 2.955 (đvtg)
+
+## Trực quan hóa
+
+Ta vẽ các biểu đồ sau
+
+```{r}
+boxplot(Diff~Happy_Sad_group, data = islander, col = 4:5)
+```
+
+Ta thấy rằng hầu như không có sự khác biệt về Diff giữa nhóm Happy (H) và nhóm Sad (S).
+
+```{r}
+boxplot(Diff~Drug, data = islander, col = 4:5)
+```
+
+Dễ dàng nhận ra với nhóm thuốc A thì thời gian hoàn thành bài kiểm tra chậm hơn nhiều so với nhóm thuốc S và T. Hai nhóm thuốc còn lại thì độ chênh lệch thời gian hoàn thành bài kiểm tra xấp xỉ nhau.
+
+```{r}
+boxplot(Diff~Dosage, data = islander, col = 4:5)
+```
+
+Với nhóm sử dụng liều lượng cao (3) thì thời gian hoàn thành bài kiểm tra chậm hơn nhiều so với nhóm thấp (1) và trung bình (2). Với nhóm (2) thì thời gian hoàn thành bài kiểm tra chậm hơn nhóm (1)
+
+# c. Phân tích ANOVA nhiều nhân tố
+
+Các nhân tố gồm: *Dosage, Drug*
+
+Ta xét model sau:
+
+```{r}
+il_mod = lm(Diff~Drug+Dosage+Happy_Sad_group, data = islander)
+summary(il_mod)
+```
+
+Mô hình trên cho ta kết quả R\^2 = 0.24 và các biến có ý nghĩa với mô hình là *Drug-S*, *Drug-T* và *Dosage*. Tuy nhiên, mô hình này chưa tốt vì R\^2 rất bé.
+
+Mô hình trên thiếu sự tương tác giữa các biến. Do đó, ta cần xem xét điều này. Một cách trực quan, ta sẽ xem xét sự tương tác giữa biến liều lương *Dosage* và biến loại thuốc *Drug*.
+
+```{r}
+interaction.plot(Drug, Dosage, Diff, lwd = 2, col = 2:5)
+```
+
+Rõ ràng các đường thẳng này cắt nhau nên giữa chúng có sự tương tác.
+
+Do đó, ta sẽ dùng mô hình tương tác sau:
+
+```{r}
+il_int = aov(Diff ~ Drug * factor(Dosage), data = islander)
+```
+
+Kế tiếp, ta tạo bảng chứa các giá trị ước tính theo thứ tự sau
+
+```{r}
+il_table = expand.grid(Drug = unique(Drug), Dosage = unique(Dosage))
+il_table
+matrix(paste0(il_table$Drug, "-", il_table$Dosage) , 3, 3, byrow = TRUE)
+```
+
+```{r}
+# Hàm ước lượng giá trị trung bình
+get_est_means = function(model, table) {
+  mat = matrix(predict(model, table), nrow = 3, ncol = 3, byrow = TRUE)
+  colnames(mat) = c("A", "S", "T")
+  rownames(mat) = c("I", "II", "III")
+  mat
+}
+```
+
+Ta thu được các giá trị ước lượng từ mô hình tương tác
+
+```{r}
+knitr::kable(get_est_means(model = il_int, table = il_table))
+```
+
+Từ kết quả trên ta rút ra nhận xét:
+
+-   Loại thuốc A gây ra tác dụng phụ lên trí nhớ bất kể liều lượng cao, thấp hay trung bình. Tuy nhiên, với liều lượng thấp thì sự ảnh hưởng không đáng kể, nhưng với liều lượng cao thì trí nhớ bị ảnh hưởng lớn.
+
+-   Loại thuốc S gây ra tác dụng phụ lên trí nhớ với liều lượng thấp. Tuy nhiên, với liều lượng từ trung bình trở lên thì trí nhớ được cải thiện.
+
+-   Loại thuốc T gây ra tác dụng phụ lên trí nhớ với liều lượng trung bình. Với liều lượng thấp hoặc cao thì trí nhớ sẽ được cải thiện.
+
+Sau khi có được các nhận định trên, ta sẽ kiểm tra mô hình thật sự có ý nghĩa hay không.
+
+```{r}
+summary(aov(Diff ~ Drug * Dosage, data = islander))
+```
+
+
+Từ bảng trên ta thấy các biến đều có ý nghĩa với mức ý nghĩa 5%.
+
+Thực hiện kiểm định Tukey
+
+```{r}
+TukeyHSD(aov(Diff ~ Drug * factor(Dosage), data = islander))
+```
+
+Nhận xét:
+
+A:1 S:1 \< S:3 T:1 \< A:3 A:2 \< A:3; A2 \> S3 =\> A3 \> A2 \> S3 \> S1; A3 \> S2 T2 \< A3 T3 \< A3
+
+-   Loại thuốc A với liều lượng cao có tác dụng phụ lên trí nhớ là cao nhất so với tất cả các loại thuốc và liều lượng. Đặc biệt, loại thuốc này với liều lượng cao gây ra tác hại lớn đối với trí nhớ.
+
+## Kiểm tra mô hình
+
+Trước hết ta sẽ kiểm tra bằng các biểu đồ:
+
+```{r}
+par(mfrow = c(2,2))
+plot(aov(Diff ~ Drug * factor(Dosage), data = islander))
+```
+
+Nhận xét:
+
+-   Biểu đồ Normal Q-Q: các giá trị gần như nằm trên 1 đường thẳng mặc dù các điểm ở phần đầu và đuôi khá lệch. Tuy nhiên, điều này vẫn chấp nhận được.
+
+Ta dùng shapiro test để kiểm định tính chuẩn của các sai số
+
+```{r}
+il_res<- residuals(object = il_int)
+shapiro.test(x=il_res)
+```
