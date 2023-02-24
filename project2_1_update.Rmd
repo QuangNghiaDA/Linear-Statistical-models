@@ -1,0 +1,350 @@
+---
+title: "Project 2.2"
+author: "Quang Nghia"
+date: "2022-11-22"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+Bài toán thực hiện trên tập tữ liệu bóng chày Major League ***Hitters.csv*** từ mùa giải 1986 và 1987.
+
+Gồm có 263 dòng và 20 biến với các thông tin cơ bản như: số lần bat, số lần run, home run,...mức lương. Ta sẽ kiểm tra xem mức lương Salary phụ thuộc như thế nào vào các biến còn lại bằng cách dùng **hồi quy thành phần chính PCR**.
+
+# a. Đọc dữ liệu và làm sạch dữ liệu
+
+Ta cần khai báo các thư viện cần thiết
+
+```{r}
+library(tidyverse)
+library(caret)
+library(pls)
+library(ISLR)
+```
+
+Đầu tiên, ta import dữ liệu dưới tên ***'hitters'***.
+
+```{r}
+hitters = na.omit(Hitters)
+head(hitters)
+```
+
+Ý nghĩa các biến:
+
+-   *AtBat:* Số lần bat năm 1986
+
+-   *Hits*: Số lần đánh bóng năm 1986
+
+-   *HmRun*: Số lần home run năm 1986
+
+-   *Runs*: Số lần ghi điểm năm 1986
+
+-   *RBI*: Số lần đánh bóng ghi điểm năm 1986
+
+-   *Walks*: Số lần walk năm 1986
+
+-   *Years*: Số năm tham gia các giải đấu lớn
+
+-   *CAtBat*: Số lần bat trong sự nghiệp
+
+-   *CHit*s: Số lần đánh bóng trong sự nghiệp
+
+-   *CHmRun*: Số lần home run trong sự nghiệp
+
+-   *CRuns*: Số lần ghi điểm trong sự nghiệp
+
+-   *CRBI*: Số lần chạy đánh bóng trong sự nghiệp
+
+-   *CWalk*s: Số lần walk trong sự nghiệp
+
+-   *League*: Giải đấu của cầu thủ vào cuối năm 1986 ( gồm A và N)
+
+-   *Division*: Thứ hạng của cầu thủ vào cuối năm 1986 (gồm E và W)
+
+-   *PutOuts*: Số lần dứt điểm trong năm 1986
+
+-   *Assists*: Số lần kiến tạo năm 1986
+
+-   *Errors*: Số lần mắc lỗi năm 1986
+
+-   *Salary*: Mức lương hàng năm vào ngày khai mạc năm 1987 (tính bằng nghìn đô la)
+
+-   *NewLeague*: Giải đấu của cầu thủ vào đầu năm 1987 (gồm A và N)
+
+```{r}
+dim(hitters)
+```
+
+Tiếp theo, ta kiểm tra xem dữ liệu có bị khuyết không.
+
+```{r}
+colSums(is.na(hitters))
+```
+
+Như vậy, data không có dữ liệu khuyết.
+
+Ta loại các biến phân loại.
+
+```{r}
+hitters <-hitters[, - c(14,15,20)]
+```
+
+Trích xuất biến *Salary*
+
+```{r}
+hitters.sal <- hitters$Salary
+head(hitters.sal)
+length(hitters.sal)
+```
+
+```{r}
+hitters$Salary <- NULL
+dim(hitters)
+```
+
+# b. Trực quan hóa dữ liệu
+
+Trong phần này ta xem xét dữ liệu có thỏa yêu cầu hay không và dùng đồ thị để rõ hơn về sự tác động giữa các biến lên biến *Salary*.
+
+```{r}
+summary(hitters)
+```
+
+Ta kiểm tra sự tương quan giữa các biến bằng sơ đồ tương quan:
+
+```{r}
+corrplot::corrplot(cor(hitters, method="pearson"), 
+                   method= "color", 
+                   order = "hclust", 
+                   tl.pos = 'n')
+```
+
+Biểu đồ trên cho thấy rằng có khá nhiều biến có sự tương quan với nhau. Do đó, phân tích thành phần chính là cần thiết đối với dữ liệu này.
+
+# c. Phân tích thành phần chính PCA
+
+PCA là một kỹ thuật thống kê để giảm kích thước của tập dữ liệu. Việc giảm kích thước đạt được bằng cách xác định các hướng chính, được gọi là các thành phần chính, trong đó dữ liệu sẽ thay đổi.
+
+PCA giả định rằng các hướng có phương sai lớn nhất là hướng "quan trọng" nhất.
+
+Phần này minh họa cách sử dụng PCA để giảm kích thước. Ta sẽ xây dựng mô hình hồi quy tuyến tính đơn giản dự đoán mức lương **Salary** dựa trên các biến độc lập. Ta sẽ sử dụng R\^2 hiệu chỉnh để đánh giá mô hình.
+
+Ta tính PCA và hiển thị phần trăm phương sai được giải thích bởi từng thành phần chính.
+
+```{r}
+library(factoextra)
+set.seed(2020)
+hitters_pca <- prcomp(hitters, center = TRUE, scale= TRUE) 
+fviz_eig(hitters_pca, addlabels = TRUE)
+
+```
+
+**Nhận xét:**
+
+-   **Từ biểu đồ trên ta thấy thành phần PC1 giải thích hơn 45% tổng phương sai, tức là gần như một nửa thông tin trong dữ liệu có thể được gói gọn chỉ bằng một thành phần chính này.**
+
+Để có cái nhìn rõ ràng hơn ta dùng hàm như sau:
+
+```{r}
+summary(hitters_pca)
+```
+
+Ta được 16 thành phần chính.
+
+PC1 giải thích 45.31% tổng phương sai. Tương tự với các biến còn lại.
+
+**Như vậy, chỉ PC1 và PC2 và PC3 có thể giải thích xấp xỉ 80% tổng phương sai.**
+
+Quan sát biểu đồ bên dưới:
+
+```{r}
+plot(summary(hitters_pca)$importance[3,])
+```
+
+Ta thấy số phần trăm phương sai đã được giải thích cho từng thành phần chính.
+
+## Vòng tròn tương quan
+
+Một biến càng gần vòng tròn tương quan thì việc giải thích nó càng quan trọng.
+
+Ta vẽ biểu đồ tương quan biến như sau. Các biến tương quan thuận hướng về cùng một phía của biểu đồ và nhóm lại với nhau. Các biến tương quan nghịch hướng về phía đối diện của biểu đồ.
+
+```{r}
+fviz_pca_var(hitters_pca, 
+             axes = c(1, 2),
+             col.var = "cos2", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+)
+
+fviz_pca_var(hitters_pca, 
+             axes = c(3, 4),
+             col.var = "cos2", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+)
+```
+
+Ở biểu đồ thứ 1 (PC1-Dim1 là trục nằm ngang; PC2-Dim2 là trục dọc): Các biến ở góc phần tư thứ I (*Runs, AtBat, RBI,*...) có sự tương quan thuận với nhau. Tương tự với các biến ở góc phần tư thứ IV (*CRuns, CHits,*...).
+
+Ở biểu đồ thứ 2: Biến *PutOuts* góp phần vào thành phần chính PC3. Biến *Assists* và *Errors* góp phần vào thành phần chính PC4.
+
+## Đóng góp của các biến vào PC
+
+Nếu một biến có giá trị đóng góp càng lớn thì biến sẽ đóng góp vào thành phần chính càng nhiều. Hàm *fviz_contrib()*[gói factoextra] có thể được sử dụng để vẽ biểu đồ thanh của các đóng góp thay đổi.
+
+```{r}
+library("FactoMineR")
+# Contributions of variables to PC1
+fviz_contrib( PCA(hitters, graph = FALSE), choice = "var", axes = 1, top = 10)
+# Contributions of variables to PC2
+fviz_contrib(PCA(hitters, graph = FALSE), choice = "var", axes = 2, top = 10)
+# Contributions of variables to PC3
+fviz_contrib(PCA(hitters, graph = FALSE), choice = "var", axes = 3, top = 10)
+# Contributions of variables to PC4
+fviz_contrib(PCA(hitters, graph = FALSE), choice = "var", axes = 4, top = 10)
+
+```
+
+Đường đứt nét màu đỏ trên biểu đồ trên biểu thị mức đóng góp trung bình dự kiến.Đối với một thành phần nhất định, một biến có đóng góp lớn hơn ngưỡng này có thể được coi là đóng góp quan trọng cho thành phần đó.
+
+**Nhận xét:**
+
+-   **Có thể thấy rằng các biến *CRBI, CRuns, CHits, CAtBat* với *AtBat, Runs* và *Hits* đóng góp nhiều nhất cho thành phần chính PC1 và PC2.**
+
+Tiếp theo ta xem xét các thành phần chính có tương quan như thế nào với biến *Salary*.
+
+```{r}
+pcs <- as.data.frame(hitters_pca$x)
+plot(hitters.sal, pcs$PC1)
+plot(hitters.sal, pcs$PC2)
+plot(hitters.sal, pcs$PC3)
+plot(hitters.sal, pcs$PC4)
+```
+
+Để rõ hơn ta xem xét trên biểu đồ tương quan. Tuy nhiên, ta chỉ quan tâm sự tương quan giữa biến *Salary* với các biến còn lại.
+
+```{r}
+library(corrplot)
+corrplot(cor(cbind(hitters.sal, pcs)[sapply(cbind(hitters.sal, pcs),is.numeric)]),method="number",order="hclust")
+```
+
+**Nhận xét:**
+
+-   **Dựa vào các biểu đồ trên ta thấy chỉ có PC1 trong số các thành phần chính trên tương quan thuận với biến phụ thuộc.**
+
+# d. Hồi quy thành phần chính
+
+Ta xem lại dữ liệu của các thành phần chính.
+
+```{r}
+ols.hitters <- cbind(hitters.sal, pcs)
+head(ols.hitters)
+```
+
+Tiếp theo ta hồi quy trên mô hình có PCA với tất cả các biến.
+
+```{r}
+lmodel <- lm(hitters.sal ~ ., data = ols.hitters) # Linear model with PCA
+summary(lmodel)
+```
+
+## Lựa chọn số thành phần chính phù hợp
+
+Để lựa chọn số thành phần chính phù hợp ta dựa trên phép đo độ chính xác - RMSEP, MSEP và R2
+
+Từ các biểu đồ bên dưới, có thể thấy rằng đối với tất cả các phép đo, điểm thay đổi mạnh nhất là 3. Đây là số lượng thành phần chính mong muốn.
+
+```{r}
+fit <- pcr(hitters.sal ~., data = cbind(hitters, hitters.sal), scale = TRUE,validation ="CV")
+```
+
+```{r}
+validationplot(fit, val.type="RMSEP", cex.axis=0.7)
+axis(side = 1, at = c(4), cex.axis=0.7)
+abline(v = 4, col = "blue", lty = 3)
+
+validationplot(fit, val.type="MSEP", cex.axis=0.7)
+axis(side = 1, at = c(4), cex.axis=0.7)
+abline(v = 4, col = "blue", lty = 3)
+
+validationplot(fit, val.type="R2", cex.axis=0.7)
+axis(side = 1, at = c(4), cex.axis=0.7)
+abline(v = 4, col = "blue", lty = 3)
+```
+
+Ta quan sát biểu đồ và thấy rằng 4 vẫn là số thành phần chính tốt nhất.
+
+Do đó, ta hồi quy trên 4 thành phần chính quan trọng nhất như sau:
+
+```{r}
+lmodel1 <- lm(hitters.sal ~ PC1 + PC2 + PC3 + PC4, data = ols.hitters) # Linear model with PCA
+summary(lmodel1)
+```
+
+Tuy nhiên, ta thấy rằng thành phần chính PC3 không có ý nghĩa đối với mô hình. Như vậy, ta loại biến này và thu được kết quả:
+
+```{r}
+lmodel2 <- lm(hitters.sal ~ PC1 + PC2 + PC4, data = ols.hitters) # Linear model with PCA
+summary(lmodel2)
+```
+
+Dù chỉ với 3 thành phần chính ta cũng có thể thu được mô hình với R\^2 hiệu chỉnh cao hơn mô hình với 4 thành phần chính.
+
+Tuy nhiên, ở phần phân tích PCA ta cũng có nhận xét rằng: chỉ có PC1 tương quan với biến *Salary* và thành phần chính này cũng giải thích 45% tổng phương sai. Do vậy, ta sẽ hổi quy theo thành phần chính này.
+
+```{r}
+lmodel3 <- lm(hitters.sal ~ PC1, data = ols.hitters) # Linear model with PCA
+summary(lmodel3)
+```
+
+Kết quả R\^2 hiệu chỉnh là 0.4
+
+**Nhận xét:**
+
+-   **Mô hình chỉ với một thành phần chính lmodel3 (PC1) có R\^2 hiệu chỉnh cũng xấp xỉ với mô hình 3 thành phần chính lmodel2 (PC1 + PC2 + PC4)**
+
+-   **Do đó, ta lựa chọn thành phần chính PC1.**
+
+Vì nếu ta chọn thêm PC2 và PC4 chỉ vì R\^2 cao hơn 0.03 thì sẽ xuất hiện thêm nhiều biến giải thích khác trong mô hình. Điều này sẽ không khiến mô hình tốt hơn nhiều nhưng sẽ làm mô hình phức tạp hơn nhiều.
+
+Ta sẽ hồi quy PC1 theo các biến giải thích và xem kết quả.
+
+```{r}
+lmodel4 <- lm(ols.hitters$PC1 ~ CRBI + CRuns + CHits + CAtBat + CHmRun + CWalks + Years, 
+              data = cbind(ols.hitters$PC1, hitters))
+summary(lmodel4)
+```
+
+Nhận xét:
+
+-   Chỉ có biến *CRuns* và *Years* là có ý nghĩa ở mức ý nghĩa 5%.
+
+-   R\^2adj = 0.88
+
+Ta tiếp tục hồi quy theo 2 biến này.
+
+```{r}
+lmodel5 <-lm(ols.hitters$PC1 ~ CRuns + Years, data = cbind(ols.hitters$PC1, hitters))
+summary(lmodel5)
+```
+
+Dù loại đi hầu hết biến nhưng ta vẫn nhận được một mô hình tốt.
+
+**Nhận xét:**
+
+-   **Chỉ với 2 biến *CRuns* và *Years* ta đã có mô hình với R\^2adj = 0.85**
+
+# ***Kết luận:***
+
+-   Nếu số lần ghi điểm trong sự nghiệp CRuns càng nhiều thì mức lương Salary sẽ càng cao
+-   Tuy nhiên, số năm tham gia giải đấu lớn Years quá nhiều thì mức lương Salary sẽ thấp
+
+Từ *lmodel3* và *lmodel5* ta suy ra:
+
+-   Salary = 535.926 + 106.852\**PC1*
+
+-   PC1 = -2.455 + 0.009\*CRuns - 0.087\*Years
+
+-   Salary = 273.604 + 0.962*\**CRuns - 9.296\*Years
